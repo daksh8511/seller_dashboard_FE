@@ -16,14 +16,16 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Upload, X, CheckCircle2, Image as ImageIcon } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import NodeApi from "@/utils/NodeApi";
+import { toast } from "sonner";
 
 const categoryOptions = [
   { label: "Electronics", value: "electronics" },
   { label: "Fashion & Apparel", value: "fashion" },
-  { label: "Home & Kitchen", value: "home" },
+  { label: "Home & Kitchen", value: "home_living" },
   { label: "Beauty & Personal Care", value: "beauty" },
   { label: "Sports & Outdoors", value: "sports" },
-  { label: "Books & Stationery", value: "books" },
 ];
 
 const ProductValidationSchema = Yup.object({
@@ -41,18 +43,12 @@ const ProductValidationSchema = Yup.object({
     .min(0, "Stock cannot be negative")
     .required("Stock quantity is required"),
   category: Yup.string().required("Please select a category"),
-  description: Yup.string()
-    .trim()
-    .min(10, "Description must be at least 10 characters")
-    .required("Description is required"),
 });
 
-export default function CreateProductPage() {
-  const [selectedImages, setSelectedImages] = useState<
-    { id: string; name: string; url: string }[]
-  >([]);
+export default function CreateUpdateProduct() {
   const [imageError, setImageError] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false)
 
   const formik = useFormik({
     initialValues: {
@@ -61,53 +57,80 @@ export default function CreateProductPage() {
       stock: "",
       category: "",
       description: "",
+      color: [],
+      product_images: [] as File[]
     },
     validationSchema: ProductValidationSchema,
     onSubmit: (values, { resetForm }) => {
-      if (selectedImages.length === 0) {
-        setImageError("At least one product image is required");
-        return;
-      }
-      setImageError("");
-      setSuccessMessage(true);
-
-      // Log submitted data as dummy action
-      console.log("Product Submitted:", {
-        ...values,
-        images: selectedImages.map((img) => img.name),
-      });
-
-      // Auto hide success badge after 4 seconds
-      setTimeout(() => {
-        setSuccessMessage(false);
-      }, 4000);
+      CreateProduct()
     },
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      if (filesArray.length === 0) return;
+  const CreateProduct = async () => {
+    setLoading(true)
+    try {
+      const formData = new FormData()
 
-      const newImages = filesArray.map((file) => ({
-        id: Math.random().toString(36).substring(2, 9),
-        name: file.name,
-        url: URL.createObjectURL(file),
-      }));
+      formData.append('product_name', formik?.values?.productName)
+      formData.append('price', formik?.values?.price)
+      formData.append('stock', formik?.values?.stock)
+      formData.append('description', formik?.values?.description)
+      formData.append('category', formik?.values?.category)
 
-      setSelectedImages((prev) => [...prev, ...newImages]);
-      setImageError("");
+      formik?.values?.product_images.forEach((image) => {
+        formData.append('product_images', image)
+      })
+      const response = await NodeApi.post(
+        "/product/create_product",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (response?.data?.success) {
+        toast.success(response?.data?.msg || 'Product create successfully')
+        formik.resetForm()
+      }
+    } catch (error) {
+      console.error("Error : ", error)
+      toast.error(error || 'Something wrong!')
     }
+    finally {
+      setLoading(false)
+    }
+  }
+
+  const handleImageChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(e.target.files || []);
+
+    const updatedImages = [
+      ...formik.values.product_images,
+      ...files,
+    ];
+
+    if (updatedImages.length > 10) {
+      setImageError("Maximum 10 images are allowed.");
+      return;
+    }
+
+    setImageError("");
+    formik.setFieldValue("product_images", updatedImages);
   };
 
-  const removeImage = (id: string) => {
-    setSelectedImages((prev) => prev.filter((img) => img.id !== id));
+  const removeImage = (index: number) => {
+    const images = [...formik.values.product_images];
+    images.splice(index, 1);
+
+    formik.setFieldValue("product_images", images);
   };
 
   const handleCancel = () => {
     formik.resetForm();
-    setSelectedImages([]);
-    setImageError("");
     setSuccessMessage(false);
   };
 
@@ -234,8 +257,8 @@ export default function CreateProductPage() {
 
             {/* 5. Description */}
             <div>
-              <Label htmlFor="description" required>
-                Description
+              <Label htmlFor="description">
+                Description (Optional)
               </Label>
               <Textarea
                 id="description"
@@ -288,40 +311,35 @@ export default function CreateProductPage() {
               )}
 
               {/* Selected Images List Preview */}
-              {selectedImages.length > 0 && (
+              {formik.values.product_images.length > 0 && (
                 <div className="mt-4">
                   <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-                    Selected Images ({selectedImages.length})
+                    Selected Images ({formik.values.product_images.length}/10)
                   </p>
+
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {selectedImages.map((img) => (
+                    {formik.values.product_images.map((file, index) => (
                       <div
-                        key={img.id}
-                        className="relative group border border-zinc-200 dark:border-zinc-800 rounded-md p-2 flex flex-col items-center bg-zinc-50 dark:bg-zinc-900"
+                        key={index}
+                        className="relative rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800"
                       >
-                        <div className="w-full h-20 bg-zinc-200 dark:bg-zinc-800 rounded flex items-center justify-center overflow-hidden mb-1">
-                          {/* Render preview image or fallback icon */}
-                          <img
-                            src={img.url}
-                            alt={img.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                          <ImageIcon className="w-6 h-6 text-zinc-400 absolute" />
-                        </div>
-                        <span className="text-[11px] text-zinc-600 dark:text-zinc-300 truncate w-full text-center font-mono">
-                          {img.name}
-                        </span>
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          className="w-full h-32 object-cover"
+                        />
+
                         <button
                           type="button"
-                          onClick={() => removeImage(img.id)}
-                          className="absolute -top-2 -right-2 bg-black text-white dark:bg-white dark:text-black rounded-full p-1 shadow-md hover:bg-red-600 dark:hover:bg-red-600 transition-colors"
-                          title="Remove image"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-2 right-2 bg-black/70 text-white rounded-full p-1 hover:bg-red-600 transition"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         </button>
+
+                        <p className="p-2 text-xs truncate text-center">
+                          {file.name}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -335,10 +353,11 @@ export default function CreateProductPage() {
                 type="button"
                 variant="outline"
                 onClick={handleCancel}
+                disabled={loading}
               >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
+              <Button disabled={loading} loading={loading} type="submit" variant="primary">
                 Create Product
               </Button>
             </div>
