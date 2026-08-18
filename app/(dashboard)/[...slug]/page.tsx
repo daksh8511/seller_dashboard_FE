@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import {
@@ -15,8 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload, X, CheckCircle2, Image as ImageIcon } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { Upload, X, CheckCircle2 } from "lucide-react";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import NodeApi from "@/utils/NodeApi";
 import { toast } from "sonner";
 
@@ -49,6 +49,11 @@ export default function CreateUpdateProduct() {
   const [imageError, setImageError] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState<boolean>(false);
   const [loading, setLoading] = useState(false)
+  const path = usePathname()
+  const isUpdateProductPage = path.includes('update_product')
+  const router = useRouter();
+  const params = useParams()
+  const slug = params?.slug?.[1] || path.split('/').filter(Boolean).pop()
 
   const formik = useFormik({
     initialValues: {
@@ -57,14 +62,60 @@ export default function CreateUpdateProduct() {
       stock: "",
       category: "",
       description: "",
-      color: [],
-      product_images: [] as File[]
+      color: [] as string[],
+      product_images: [] as any[]
     },
     validationSchema: ProductValidationSchema,
-    onSubmit: (values, { resetForm }) => {
-      CreateProduct()
+    onSubmit: (values) => {
+      if (isUpdateProductPage) {
+        UpdateProduct(values)
+      } else {
+        CreateProduct()
+      }
     },
   });
+
+  const UpdateProduct = async (value: any) => {
+    setLoading(true)
+
+    try {
+      const formData = new FormData()
+
+      formData.append('product_name', value.productName)
+      formData.append('price', String(value.price))
+      formData.append('stock', String(value.stock))
+      formData.append('category', value.category)
+      formData.append('description', value.description || '')
+
+      value.product_images.forEach((image: any) => {
+        if (image instanceof File) {
+          formData.append('product_images', image)
+        } else if (typeof image === 'string') {
+          formData.append('existing_images', image)
+        }
+      })
+
+      const response = await NodeApi.patch(
+        `/product/update_product/${slug}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+
+      if (response?.data?.success) {
+        toast.success(response?.data?.msg || 'Product updated successfully')
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      console.error('error:', error)
+      toast.error('Something went wrong!')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const CreateProduct = async () => {
     setLoading(true)
@@ -72,9 +123,9 @@ export default function CreateUpdateProduct() {
       const formData = new FormData()
 
       formData.append('product_name', formik?.values?.productName)
-      formData.append('price', formik?.values?.price)
-      formData.append('stock', formik?.values?.stock)
-      formData.append('description', formik?.values?.description)
+      formData.append('price', String(formik?.values?.price || ''))
+      formData.append('stock', String(formik?.values?.stock || ''))
+      formData.append('description', formik?.values?.description || '')
       formData.append('category', formik?.values?.category)
 
       formik?.values?.product_images.forEach((image) => {
@@ -92,11 +143,12 @@ export default function CreateUpdateProduct() {
 
       if (response?.data?.success) {
         toast.success(response?.data?.msg || 'Product create successfully')
-        formik.resetForm()
+        // formik.resetForm()
+        router.push('/dashboard')
       }
     } catch (error) {
       console.error("Error : ", error)
-      toast.error(error || 'Something wrong!')
+      toast.error('Something wrong!')
     }
     finally {
       setLoading(false)
@@ -129,20 +181,50 @@ export default function CreateUpdateProduct() {
     formik.setFieldValue("product_images", images);
   };
 
-  const handleCancel = () => {
-    formik.resetForm();
-    setSuccessMessage(false);
+  const getImagePreviewUrl = (image: string | File) => {
+    if (typeof image === "string") {
+      return image;
+    }
+
+    return URL.createObjectURL(image);
   };
+
+  const GetSingleProduct = async () => {
+    try {
+      const response = await NodeApi.get(`/product/get_product/${slug}`)
+
+      formik.setValues({
+        productName: response?.data?.product?.product_name,
+        price: response?.data?.product?.price,
+        stock: response?.data?.product?.stock,
+        category: response?.data?.product?.category,
+        description: response?.data?.product?.description,
+        color: response?.data?.product?.color,
+        product_images: response?.data?.product?.product_images || []
+      })
+    } catch (error) {
+      console.error("Error : ", error)
+      toast.error("Unable to load product")
+    }
+  }
+
+  useEffect(() => {
+    if (isUpdateProductPage) {
+      GetSingleProduct()
+    }
+  }, [])
 
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Header */}
       <div className="pb-4 border-b border-zinc-200 dark:border-zinc-800">
         <h2 className="text-2xl font-bold tracking-tight text-black dark:text-white">
-          Create Product
+          {isUpdateProductPage ? 'Update' : 'Create Product'}
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Add a new item to your catalog with pricing, inventory, and media.
+          {
+            isUpdateProductPage ? ' Update item to your catalog with pricing, inventory, and media.' : ' Add a new item to your catalog with pricing, inventory, and media.'
+          }
         </p>
       </div>
 
@@ -162,7 +244,8 @@ export default function CreateUpdateProduct() {
         <CardHeader>
           <CardTitle>Product Information</CardTitle>
           <CardDescription>
-            Fill in the details below to create your product listing.
+            {isUpdateProductPage ? 'Update in the details below your product.' : 'Fill in the details below to create your product listing.'}
+
           </CardDescription>
         </CardHeader>
 
@@ -318,30 +401,37 @@ export default function CreateUpdateProduct() {
                   </p>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {formik.values.product_images.map((file, index) => (
-                      <div
-                        key={index}
-                        className="relative rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800"
-                      >
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={file.name}
-                          className="w-full h-32 object-cover"
-                        />
+                    {formik.values.product_images.map((file, index) => {
+                      const previewUrl = getImagePreviewUrl(file);
+                      const fileName = typeof file === "string"
+                        ? file.split("/").pop() || "Product image"
+                        : file.name;
 
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute top-2 right-2 bg-black/70 text-white rounded-full p-1 hover:bg-red-600 transition"
+                      return (
+                        <div
+                          key={index}
+                          className="relative rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800"
                         >
-                          <X className="w-4 h-4" />
-                        </button>
+                          <img
+                            src={previewUrl}
+                            alt={fileName}
+                            className="w-full h-32 object-cover"
+                          />
 
-                        <p className="p-2 text-xs truncate text-center">
-                          {file.name}
-                        </p>
-                      </div>
-                    ))}
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-2 right-2 bg-black/70 text-white rounded-full p-1 hov?er:bg-red-600 transition"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+
+                          <p className="p-2 text-xs truncate text-center">
+                            {fileName}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -352,13 +442,13 @@ export default function CreateUpdateProduct() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleCancel}
+                onClick={() => router.push('/dashboard')}
                 disabled={loading}
               >
                 Cancel
               </Button>
               <Button disabled={loading} loading={loading} type="submit" variant="primary">
-                Create Product
+                {isUpdateProductPage ? 'Update' : 'Create Product'}
               </Button>
             </div>
           </form>

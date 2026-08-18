@@ -46,7 +46,6 @@ export default function SignupPage() {
     },
     validationSchema: SignupSchema,
     onSubmit: (values) => {
-      console.log("Sign up submitted:", values);
       router.push("/dashboard");
     },
   });
@@ -172,7 +171,7 @@ export default function SignupPage() {
                   onBlur={formik.handleBlur}
                   error={
                     formik.touched.confirmPassword &&
-                    formik.errors.confirmPassword
+                      formik.errors.confirmPassword
                       ? formik.errors.confirmPassword
                       : undefined
                   }

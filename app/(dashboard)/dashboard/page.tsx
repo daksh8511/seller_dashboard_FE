@@ -1,5 +1,5 @@
 'use client'
-import { Loader2, Edit, Trash2, Image } from "lucide-react";
+import { Loader2, Edit, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import NodeApi from "@/utils/NodeApi";
@@ -7,14 +7,28 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useRouter } from "next/navigation";
+import DeleteBox from "@/components/DeleteBox";
+
+interface ProductsTypes {
+  product_name: string;
+  price: number,
+  stock: number;
+  description: string;
+  product_images: [string];
+  color: [string];
+  category: string;
+  _id: string
+}
 
 export default function DashboardPage() {
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState<ProductsTypes[]>([])
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 5
   const router = useRouter()
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const FetchProducts = async () => {
     try {
@@ -48,10 +62,20 @@ export default function DashboardPage() {
     if (page > totalPages) setPage(totalPages)
   }, [totalPages])
 
-  const paged = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filtered.slice(start, start + pageSize)
-  }, [filtered, page])
+  const handleDelete = async (productId) => {
+    setDeleteLoading(true)
+    try {
+      const response = await NodeApi.delete(`product/delete_product/${productId}`)
+      if (response.data?.success) {
+        toast.success(response?.data?.msg)
+        FetchProducts()
+      }
+    } catch (error) {
+      console.error('Error : ', error)
+    } finally {
+      setDeleteLoading(true)
+    }
+  }
 
   return loading ? (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -95,20 +119,18 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.length === 0 ? (
+                    {products.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-8 text-center text-sm text-zinc-500">No products found.</td>
                       </tr>
                     ) : (
-                      paged.map((p, idx) => (
+                      products.map((p, idx) => (
                         <tr key={p._id || idx} className="border-b last:border-b-0">
                           <td className="py-3">
                             <div className="w-12 h-12 rounded-md bg-zinc-100 dark:bg-zinc-900 overflow-hidden flex items-center justify-center">
-                              {p.product_images && p.product_images[0] ? (
+                              {p.product_images[0] && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={p.product_images[0]} alt={p.product_name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Image className="text-zinc-400" />
                               )}
                             </div>
                           </td>
@@ -132,7 +154,7 @@ export default function DashboardPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDelete(p._id)}
+                                onClick={() => setDeleteProductId(p._id)}
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
@@ -147,12 +169,12 @@ export default function DashboardPage() {
 
               {/* Mobile Cards */}
               <div className="grid grid-cols-1 gap-4 lg:hidden">
-                {paged.length === 0 ? (
+                {products.length === 0 ? (
                   <div className="text-center py-10 text-sm text-zinc-500">
                     No products found.
                   </div>
                 ) : (
-                  paged.map((p, idx) => (
+                  products.map((p, idx) => (
                     <div
                       key={p._id || idx}
                       className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-950 shadow-sm"
@@ -160,16 +182,12 @@ export default function DashboardPage() {
                       <div className="flex gap-4">
                         {/* Image */}
                         <div className="w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-900">
-                          {p.product_images?.[0] ? (
+                          {p.product_images?.[0] && (
                             <img
                               src={p.product_images[0]}
                               alt={p.product_name}
                               className="w-full h-full object-cover"
                             />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Image className="w-8 h-8 text-zinc-400" />
-                            </div>
                           )}
                         </div>
 
@@ -255,6 +273,10 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {
+        deleteProductId && <DeleteBox deleteLoading={deleteLoading} deleteProductId={deleteProductId} handleDelete={handleDelete} setDeleteProductId={setDeleteProductId} />
+      }
     </div>
   )
 }

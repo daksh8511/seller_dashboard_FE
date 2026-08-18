@@ -37,7 +37,6 @@ export default function SigninPage() {
     },
     validationSchema: SigninSchema,
     onSubmit: (values) => {
-      console.log("Sign in submitted:", values);
       router.push("/dashboard");
     },
   });
