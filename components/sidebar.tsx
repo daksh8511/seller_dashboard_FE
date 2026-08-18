@@ -12,7 +12,6 @@ import {
   Menu,
   X,
   Store,
-  ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,11 +30,6 @@ export const navItems = [
     name: "Create Product",
     href: "/create-product",
     icon: PackagePlus,
-  },
-  {
-    name: "Orders",
-    href: "/orders",
-    icon: ClipboardList,
   },
   {
     name: "Setting",
