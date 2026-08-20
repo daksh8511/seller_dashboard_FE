@@ -10,6 +10,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const user = JSON.parse(localStorage.getItem('auth') || "{}")
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-zinc-50 dark:bg-black text-black dark:text-white antialiased">
@@ -36,8 +37,8 @@ export default function DashboardLayout({
                 <User className="w-4 h-4" />
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-xs font-semibold text-black dark:text-white">Admin Seller</p>
-                <p className="text-[10px] text-zinc-500">store@shopnova.com</p>
+                <p className="text-xs font-semibold text-black dark:text-white">{user?.ownerName}</p>
+                <p className="text-[10px] text-zinc-500">{user?.email}com</p>
               </div>
             </div>
           </div>

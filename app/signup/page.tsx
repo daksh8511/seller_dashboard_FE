@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
@@ -15,17 +15,22 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Store, User, Mail, Lock, ArrowRight } from "lucide-react";
+import { Store, User, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import NodeApi from "@/utils/NodeApi";
+import { toast } from "sonner";
 
 const SignupSchema = Yup.object({
-  fullName: Yup.string()
+  ownerName: Yup.string()
     .trim()
     .min(2, "Name must be at least 2 characters")
-    .required("Full Name is required"),
+    .required("Owner Name is required"),
   email: Yup.string()
     .trim()
     .email("Invalid email address")
     .required("Email address is required"),
+  storeName: Yup.string()
+    .trim()
+    .required("Store name is required"),
   password: Yup.string()
     .min(6, "Password must be at least 6 characters")
     .required("Password is required"),
@@ -36,19 +41,53 @@ const SignupSchema = Yup.object({
 
 export default function SignupPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false)
 
   const formik = useFormik({
     initialValues: {
-      fullName: "",
+      ownerName: "",
       email: "",
       password: "",
       confirmPassword: "",
+      storeName: ""
     },
     validationSchema: SignupSchema,
     onSubmit: (values) => {
-      router.push("/dashboard");
+      handleSignup()
     },
   });
+
+  const handleSignup = async () => {
+    try {
+      setLoading(true)
+      const response = await NodeApi.post('/store/signup', {
+        ownerName: formik?.values?.ownerName,
+        email: formik?.values?.email,
+        password: formik?.values?.password,
+        storeName: formik?.values?.storeName
+      })
+
+
+      if (response?.data?.success) {
+        const storeData = {
+          ownerName: response?.data?.store?.ownerName,
+          email: response?.data?.store?.email,
+          storeName: response?.data?.store?.storeName,
+          _id: response?.data?.store?._id
+        }
+        localStorage.setItem('auth', JSON.stringify(storeData))
+        localStorage.setItem('token', JSON.stringify(response?.data?.token))
+
+        router.push("/dashboard");
+      }
+
+    } catch (error) {
+      console.error('error : ', error)
+      toast.error(error?.response?.data?.msg)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-zinc-50 dark:bg-black text-black dark:text-white">
@@ -72,25 +111,25 @@ export default function SignupPage() {
           <form onSubmit={formik.handleSubmit} className="space-y-4">
             {/* Full Name */}
             <div>
-              <Label htmlFor="fullName" required>
-                Full Name
+              <Label htmlFor="ownerName" required>
+                Owner name
               </Label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">
                   <User className="w-4 h-4" />
                 </div>
                 <Input
-                  id="fullName"
-                  name="fullName"
+                  id="ownerName"
+                  name="ownerName"
                   type="text"
                   className="pl-9"
                   placeholder="Alex Harrison"
-                  value={formik.values.fullName}
+                  value={formik.values.ownerName}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   error={
-                    formik.touched.fullName && formik.errors.fullName
-                      ? formik.errors.fullName
+                    formik.touched.ownerName && formik.errors.ownerName
+                      ? formik.errors.ownerName
                       : undefined
                   }
                 />
@@ -118,6 +157,33 @@ export default function SignupPage() {
                   error={
                     formik.touched.email && formik.errors.email
                       ? formik.errors.email
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Store name Field */}
+            <div>
+              <Label htmlFor="storeName" required>
+                Store name
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <Input
+                  id="storeName"
+                  name="storeName"
+                  className="pl-9"
+                  placeholder="ShopNova"
+                  value={formik.values.storeName}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={
+                    formik.touched.storeName &&
+                      formik.errors.storeName
+                      ? formik.errors.storeName
                       : undefined
                   }
                 />
@@ -184,7 +250,11 @@ export default function SignupPage() {
               type="submit"
               variant="primary"
               className="w-full space-x-2 mt-2"
+              disabled={loading}
             >
+              {
+                loading && <Loader2 />
+              }
               <span>Create Account</span>
               <ArrowRight className="w-4 h-4" />
             </Button>

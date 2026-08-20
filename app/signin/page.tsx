@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
@@ -15,7 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Store, ArrowRight, Lock, Mail } from "lucide-react";
+import { Store, ArrowRight, Lock, Mail, Loader2 } from "lucide-react";
+import NodeApi from "@/utils/NodeApi";
+import { toast } from "sonner";
 
 const SigninSchema = Yup.object({
   email: Yup.string()
@@ -29,6 +31,7 @@ const SigninSchema = Yup.object({
 
 export default function SigninPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false)
 
   const formik = useFormik({
     initialValues: {
@@ -37,9 +40,37 @@ export default function SigninPage() {
     },
     validationSchema: SigninSchema,
     onSubmit: (values) => {
-      router.push("/dashboard");
+      SigninStore()
     },
   });
+
+  const SigninStore = async () => {
+    try {
+      setLoading(true)
+      const response = await NodeApi.post('/store/signin', {
+        email: formik?.values?.email,
+        password: formik?.values?.password,
+      })
+
+      if (response?.data?.success) {
+        toast.success(response?.data?.msg)
+        const storeData = {
+          ownerName: response?.data?.store?.ownerName,
+          email: response?.data?.store?.email,
+          storeName: response?.data?.store?.storeName,
+          _id: response?.data?.store?._id
+        }
+        localStorage.setItem('auth', JSON.stringify(storeData))
+        localStorage.setItem('token', JSON.stringify(response?.data?.token))
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.log('error : ', error)
+      toast.error(error?.response?.data?.msg)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-zinc-50 dark:bg-black text-black dark:text-white">
@@ -120,7 +151,9 @@ export default function SigninPage() {
               type="submit"
               variant="primary"
               className="w-full space-x-2 mt-2"
+              disabled={loading}
             >
+              {loading && <Loader2 />}
               <span>Sign In</span>
               <ArrowRight className="w-4 h-4" />
             </Button>

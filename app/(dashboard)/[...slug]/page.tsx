@@ -47,13 +47,13 @@ const ProductValidationSchema = Yup.object({
 
 export default function CreateUpdateProduct() {
   const [imageError, setImageError] = useState<string>("");
-  const [successMessage, setSuccessMessage] = useState<boolean>(false);
   const [loading, setLoading] = useState(false)
   const path = usePathname()
   const isUpdateProductPage = path.includes('update_product')
   const router = useRouter();
   const params = useParams()
   const slug = params?.slug?.[1] || path.split('/').filter(Boolean).pop()
+  const auth = JSON.parse(localStorage.getItem('auth') || "{}")
 
   const formik = useFormik({
     initialValues: {
@@ -86,6 +86,7 @@ export default function CreateUpdateProduct() {
       formData.append('stock', String(value.stock))
       formData.append('category', value.category)
       formData.append('description', value.description || '')
+      formData.append('store_id', auth?._id)
 
       value.product_images.forEach((image: any) => {
         if (image instanceof File) {
@@ -127,6 +128,7 @@ export default function CreateUpdateProduct() {
       formData.append('stock', String(formik?.values?.stock || ''))
       formData.append('description', formik?.values?.description || '')
       formData.append('category', formik?.values?.category)
+      formData.append('store_id', auth?._id)
 
       formik?.values?.product_images.forEach((image) => {
         formData.append('product_images', image)
@@ -228,16 +230,6 @@ export default function CreateUpdateProduct() {
         </p>
       </div>
 
-      {/* Success Notification */}
-      {successMessage && (
-        <div className="p-4 rounded-md bg-black text-white dark:bg-white dark:text-black flex items-center space-x-3 transition-all duration-300 shadow-md">
-          <CheckCircle2 className="w-5 h-5 shrink-0" />
-          <div className="text-sm">
-            <span className="font-semibold">Success!</span> Product &quot;
-            {formik.values.productName}&quot; created successfully.
-          </div>
-        </div>
-      )}
 
       {/* Form Card */}
       <Card className="border-zinc-200 dark:border-zinc-800">

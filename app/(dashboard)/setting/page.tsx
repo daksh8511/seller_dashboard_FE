@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -12,13 +12,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { User, Store, LogOut, CheckCircle2 } from "lucide-react";
+import { User, Store, LogOut, CheckCircle2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import NodeApi from "@/utils/NodeApi";
 
 export default function SettingPage() {
   const router = Router();
-  const [userName, setUserName] = useState("Alex Harrison");
-  const [shopName, setShopName] = useState("ShopNova Flagship Store");
+  const user = JSON.parse(localStorage.getItem('auth') || "{}")
+  const [hasChanges, setHasChanges] = useState(false)
+  const [userName, setUserName] = useState(user?.ownerName);
+  const [shopName, setShopName] = useState(user?.storeName);
   const [savedBadge, setSavedBadge] = useState(false);
+  const [loading, setLoading] = useState(false)
 
   function Router() {
     return useRouter();
@@ -33,8 +38,56 @@ export default function SettingPage() {
   };
 
   const handleLogout = () => {
-    // Perform simple logout redirection
+    localStorage.removeItem('auth')
+    localStorage.removeItem('token')
     router.push("/signin");
+  };
+
+  useEffect(() => {
+    const changed =
+      userName !== (user?.ownerName || "") ||
+      shopName !== (user?.storeName || "");
+
+    setHasChanges(changed);
+  }, [userName, shopName, user]);
+
+  const UpdateSetting = async () => {
+    try {
+      setLoading(true);
+
+      const response = await NodeApi.patch(
+        `/store/update_store/${user?._id}`,
+        {
+          ownerName: userName,
+          storeName: shopName,
+        }
+      );
+
+      if (response?.data?.success) {
+        const updatedUser = response?.data?.store;
+
+        const currentUser = JSON.parse(
+          localStorage.getItem("auth") || "{}"
+        );
+
+        const UserConfig = {
+          ...currentUser,
+          ownerName: updatedUser?.ownerName,
+          storeName: updatedUser?.storeName,
+        };
+
+        localStorage.setItem("auth", JSON.stringify(UserConfig));
+
+        toast.success(response?.data?.msg);
+
+        setHasChanges(false);
+      }
+    } catch (error: any) {
+      console.error("Error : ", error);
+      toast.error(error?.response?.data?.msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -110,8 +163,8 @@ export default function SettingPage() {
             </div>
 
             <div className="pt-2 flex justify-end">
-              <Button type="submit" variant="primary">
-                Save Settings
+              <Button onClick={() => UpdateSetting()} disabled={!hasChanges} type="submit" variant="primary">
+                {loading && <Loader2 />} Save Settings
               </Button>
             </div>
           </form>
